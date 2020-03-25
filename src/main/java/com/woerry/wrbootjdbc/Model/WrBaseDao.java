@@ -3,12 +3,8 @@ package com.woerry.wrbootjdbc.Model;
 
 
 
-import com.alibaba.fastjson.JSON;
-import com.picc.woerry.bidbond.Data.Annotation.WrTable;
-import com.picc.woerry.bidbond.Data.Annotation.WrUnionkey;
-import com.picc.woerry.bidbond.Utils.DefaultRowMapper;
-import com.picc.woerry.bidbond.Utils.SqlContext;
-import com.picc.woerry.bidbond.Utils.SqlUtils;
+
+import com.woerry.wrbootjdbc.Data.Annotation.WrUnionkey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

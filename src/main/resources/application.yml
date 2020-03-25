@@ -1,0 +1,30 @@
+server:
+  port: 11111
+spring:
+  datasource:
+    druid:
+      driver-class-name: org.h2.Driver
+      url: jdbc:h2:~/wrh2
+      username: sa
+      password: 518wsgtc
+      filters: stat
+      initialSize: 10
+      maxActive: 300
+      maxWait: 60000
+      timeBetweenEvictionRunsMillis: 60000
+      minEvictableIdleTimeMillis: 600000
+      validationQuery: SELECT 1
+      testWhileIdle: true
+      testOnBorrow: false
+      testOnReturn: false
+      poolPreparedStatements: false
+      maxPoolPreparedStatementPerConnectionSize: 200
+
+  jpa:
+    database: h2
+    hibernate:
+      ddl-auto: update
+  h2:
+    console:
+      path: /h2-console
+      enabled: true
