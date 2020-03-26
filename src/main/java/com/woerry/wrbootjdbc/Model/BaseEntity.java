@@ -1,11 +1,9 @@
 package com.woerry.wrbootjdbc.Model;
 
 
-import com.picc.woerry.bidbond.Data.Annotation.WrColumn;
-import com.picc.woerry.bidbond.Data.Annotation.WrPrimarykey;
-import com.picc.woerry.bidbond.Data.Annotation.WrTable;
-import com.picc.woerry.bidbond.Data.Annotation.WrUnionkey;
-import com.picc.woerry.bidbond.Utils.NameHandler;
+
+import com.woerry.wrbootjdbc.Data.Annotation.*;
+import com.woerry.wrbootjdbc.Exception.BaseException;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -14,41 +12,72 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class  BaseEntity<T> implements Serializable ,NameHandler {
+public class  BaseEntity<T> implements Serializable  {
 
 
     private static final long serialVersionUID = -117426825547412173L;
     private String tablename;
     private String key;
     private List<WrUnionkey> ukeys=new ArrayList<WrUnionkey>();
+    private List<WrForeignkey> fkeys=new ArrayList<WrForeignkey>();
     private List<WrColumn> cols=new ArrayList<WrColumn>();
+
     private String allcols;
+    private WrPrimarykey wrPrimarykey=null;
     private Map<String,String> columns=new HashMap<String, String>();
 
+    private int keyCount=0;
+
+    /***
+     * 主键或联合主键数量
+     *
+     * @param
+     * @return  {@link int}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-26 15:43
+     */
+    public int getKeyCount() {
+        return keyCount;
+    }
+
+    /***
+     * 取所有字段，包括主键。取的value是Wr注解中的name=值
+     *
+     * @param
+     * @return  {@link Map< String, String>}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-26 14:58
+     */
     public Map<String, String> getColumns() {
         return columns;
     }
 
 
+    public WrPrimarykey getWrPrimarykey() {
+        return wrPrimarykey;
+    }
 
-
-
+    public List<WrForeignkey> getFkeys() {
+        return fkeys;
+    }
+    private int key1=0;
+    private int key2=0;
     public BaseEntity(Class<T> tclass){
 
 
-        //String key=null;
-      //  String table=null;
-       // List<WrUnionkey> ukeys=new ArrayList();
-        //List<WrColumn> cols=new ArrayList();
         Field[] fields= tclass.getDeclaredFields();
         WrTable wrTable=tclass.getAnnotation(WrTable.class);
         tablename=wrTable.name();
         for (Field field:fields
                 ) {
-            WrPrimarykey wrPrimarykey=field.getAnnotation(WrPrimarykey.class);
+             wrPrimarykey=field.getAnnotation(WrPrimarykey.class);
             if (wrPrimarykey!=null){
                 key=wrPrimarykey.name();
                 columns.put(field.getName(),key);
+                keyCount=1;
+                key1=1;
                 continue;
             }
 
@@ -56,6 +85,14 @@ public class  BaseEntity<T> implements Serializable ,NameHandler {
             if (wrUnionkey!=null){
                 ukeys.add(wrUnionkey);
                 columns.put(field.getName(),wrUnionkey.name());
+                keyCount++;
+                key2=1;
+                continue;
+            }
+            WrForeignkey wrForeignkey=field.getAnnotation(WrForeignkey.class);
+            if (wrForeignkey!=null){
+                fkeys.add(wrForeignkey);
+                columns.put(field.getName(),wrForeignkey.name());
                 continue;
             }
             WrColumn wrColumn=field.getAnnotation(WrColumn.class);
@@ -65,14 +102,15 @@ public class  BaseEntity<T> implements Serializable ,NameHandler {
                 continue;
             }
         }
-
-
+        if(key1+key2>1){
+            throw new BaseException("不能同时设置主键和联合主键！");
+        }
+        key1=0;
+        key2=0;
         if (key==null&&ukeys==null){
-            try {
-                throw new Exception("类中没有@WrPrimarykey或@WrUnionkey主键。");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+
+                throw new BaseException("类中没有@WrPrimarykey或@WrUnionkey主键。");
+
         }
 
         generateAllcols(key,  ukeys, cols);
@@ -92,12 +130,7 @@ public class  BaseEntity<T> implements Serializable ,NameHandler {
         String result="";
         if(key!=null&&!key.equals("")){
             result=" "+key+" ";
-            if(ukeys.size()>0){
-                for (WrUnionkey uk:ukeys
-                        ) {
-                    result=result+","+uk.name();
-                }
-            }
+
         }else{
             if(ukeys.size()>0){
                 int i=0;

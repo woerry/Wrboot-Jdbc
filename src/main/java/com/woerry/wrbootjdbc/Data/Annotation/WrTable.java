@@ -1,5 +1,7 @@
 package com.woerry.wrbootjdbc.Data.Annotation;
 
+import com.woerry.wrbootjdbc.Data.Constant.DbType;
+
 import java.lang.annotation.*;
 
 @Target(ElementType.TYPE)
@@ -7,6 +9,7 @@ import java.lang.annotation.*;
 @Documented
 public @interface WrTable {
 String name() ;
+DbType dbType();
 String database() default "";
-int keynum() default 0;
+int keynum() default 1;
 }

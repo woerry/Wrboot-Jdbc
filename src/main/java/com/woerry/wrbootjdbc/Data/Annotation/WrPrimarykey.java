@@ -1,5 +1,7 @@
 package com.woerry.wrbootjdbc.Data.Annotation;
 
+import com.woerry.wrbootjdbc.Data.Constant.ColType;
+
 import java.lang.annotation.*;
 
 @Target({ElementType.FIELD})
@@ -7,8 +9,10 @@ import java.lang.annotation.*;
 @Documented
 public @interface WrPrimarykey {
     String name() ;
-    int size() default 0;
-    String type() default "";
+    boolean isAutoCreate();
+    int size() default 1;
+    ColType colType() ;
+    String colTypeArgs() default "";//在coltype之后的参数，比如DECIMAL(3，2)的 (3，2)，括号要英文状态
     String remark() default "";
     int sequence() default 0;
 }

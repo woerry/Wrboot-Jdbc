@@ -4,7 +4,12 @@ package com.woerry.wrbootjdbc.Model;
 
 
 
+import com.alibaba.fastjson.JSON;
+import com.woerry.wrbootjdbc.Data.Annotation.WrTable;
 import com.woerry.wrbootjdbc.Data.Annotation.WrUnionkey;
+import com.woerry.wrbootjdbc.Data.Constant.OrderType;
+import com.woerry.wrbootjdbc.Utils.DefaultRowMapper;
+import com.woerry.wrbootjdbc.Utils.WrSqlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +25,8 @@ import java.lang.reflect.ParameterizedType;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Types;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +39,7 @@ import java.util.Map;
 public  class WrBaseDao <T> {
     private Logger log = LoggerFactory.getLogger(WrBaseDao.class);
     private Class<T> tclass;
-        private List<WrUnionkey> forignkeys=null;
+        private List<WrUnionkey> unionkeys=null;
     public WrBaseDao() {
 
        Class objclass= (Class<T>) ((ParameterizedType) getClass()
@@ -51,28 +58,23 @@ public  class WrBaseDao <T> {
 
     private  BaseEntity beseentity=null;
 
-    private String allCols=null;
    private   void  setTableClass() throws Exception {
-
-
 
        if ( tclass.isAnnotationPresent(WrTable.class)){
 
-           //beseentity=new BaseEntity(tclass);
            beseentity=new BaseEntity<T>(tclass);
            if (beseentity.getUkeys()!=null&&beseentity.getUkeys().size()>0){
-               forignkeys=beseentity.getUkeys();
+               unionkeys=beseentity.getUkeys();
            }
 
-           log.info("columns="+JSON.toJSON(beseentity.getColumns()));
+           log.info("columns="+ JSON.toJSON(beseentity.getColumns()));
        }else {
            throw new Exception("类中没有@WrTable注释");
        }
 
    }
 
-    @Autowired
-    @Qualifier("devJdbcTemplate")
+
     private JdbcTemplate jdbcTemplate;
 
     public JdbcTemplate getJdbcTemplate() {
@@ -96,44 +98,30 @@ public  class WrBaseDao <T> {
      * @param entity
      */
     public Long insert(T entity) {
-        final SqlContext sqlContext = SqlUtils.buildInsertSql(entity, this.beseentity);
         KeyHolder keyHolder = new GeneratedKeyHolder();
-        log.info("insert:"+entity.getClass().getSimpleName()+",sql="+sqlContext.getSql());
-        PreparedStatementCreator psc=new PreparedStatementCreator(){
-            public PreparedStatement createPreparedStatement(Connection con) throws SQLException {
-                PreparedStatement ps = con.prepareStatement(sqlContext.getSql().toString(),
-                        new String[] { sqlContext.getPrimaryKey() });
-                int index = 0;
-                for (Object param : sqlContext.getParams()) {
-                    index++;
-                    ps.setObject(index, param);
-                }
-                return ps;
-            }
-        };
-        jdbcTemplate.update(psc , keyHolder);
-//        List<Object> os=sqlContext.getParams();
-//        Object[] objs= os.toArray();
-//       int i= jdbcTemplate.update(sqlContext.getSql().toString(),objs);
+//        final SqlContext sqlContext = SqlUtils.buildInsertSql(entity, this.beseentity);
+//
+//        log.info("insert:"+entity.getClass().getSimpleName()+",sql="+sqlContext.getSql());
+//        PreparedStatementCreator psc=new PreparedStatementCreator(){
+//            public PreparedStatement createPreparedStatement(Connection con) throws SQLException {
+//                PreparedStatement ps = con.prepareStatement(sqlContext.getSql().toString(),
+//                        new String[] { sqlContext.getPrimaryKey() });
+//                int index = 0;
+//                for (Object param : sqlContext.getParams()) {
+//                    index++;
+//                    ps.setObject(index, param);
+//                }
+//                return ps;
+//            }
+//        };
+//        jdbcTemplate.update(psc , keyHolder);
+
+
         return keyHolder.getKey().longValue();
 //        return i;
     }
 
-    /**
-     * 插入一条记录(非自增主键适用)
-     *
-     * @param entity
-     */
-    public int insert2(T entity) {
-        final SqlContext sqlContext = SqlUtils.buildInsertSql(entity, this.beseentity);
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        log.info("非自增insert:"+entity.getClass().getSimpleName()+",sql="+sqlContext.getSql()+",params="+JSON.toJSON(sqlContext.getParams()));
 
-        List<Object> os=sqlContext.getParams();
-        Object[] objs= os.toArray();
-       int i= jdbcTemplate.update(sqlContext.getSql().toString(),objs);
-        return i;
-    }
 
     /**
      * 更新记录
@@ -142,9 +130,9 @@ public  class WrBaseDao <T> {
      */
 
     public void update(T entity) {
-        SqlContext sqlContext = SqlUtils.buildUpdateSql(entity, this.beseentity);
-
-        jdbcTemplate.update(sqlContext.getSql().toString(), sqlContext.getParams().toArray());
+//        SqlContext sqlContext = SqlUtils.buildUpdateSql(entity, this.beseentity);
+//
+//        jdbcTemplate.update(sqlContext.getSql().toString(), sqlContext.getParams().toArray());
     }
 
 
@@ -159,22 +147,52 @@ public  class WrBaseDao <T> {
      * @date 2020-03-20 15:04
      */
     public void updateExcept(T entity,@Nullable String exceptcolumn) {
-        SqlContext sqlContext = SqlUtils.buildUpdateSqlExcept(entity, this.beseentity,exceptcolumn);
-        System.out.println("updateExceptsql="+sqlContext.getSql());
-        jdbcTemplate.update(sqlContext.getSql().toString(), sqlContext.getParams().toArray());
+//        SqlContext sqlContext = SqlUtils.buildUpdateSqlExcept(entity, this.beseentity,exceptcolumn);
+//        System.out.println("updateExceptsql="+sqlContext.getSql());
+//        jdbcTemplate.update(sqlContext.getSql().toString(), sqlContext.getParams().toArray());
     }
 
-    /**
-     * 删除记录
-     *
-     * @param id
-     */
 
-    public void delete(Serializable id) {
+    /***
+     * 删除数据
+     *
+     * @param map
+     * @return  {@link int}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-26 18:01
+     */
+    public int delete(Map<String,Object> map) {
         String tableName = this.beseentity.getTableName();
-        String primaryName = this.beseentity.getPrimaryName();
-        String sql = "DELETE FROM " + tableName + " WHERE " + primaryName + " = ?";
-        jdbcTemplate.update(sql, id);
+        String sql = "DELETE FROM " + tableName ;
+        Object[] objects=new Object[map.entrySet().size()];
+        int[] types=new int[map.entrySet().size()];
+        int i=0;
+                if(map!=null){
+                    for (Map.Entry<String, Object> entry : map.entrySet()) {
+                        sql=sql+ " WHERE "+entry.getKey()+"=?";
+                        objects[i]=entry.getValue();
+                        types[i]=WrSqlUtils.switchArgTypeToInt(entry.getValue());
+                        i++;
+                    }
+                }
+
+       return jdbcTemplate.update(sql,objects,types);
+    }
+
+    /***
+     * 根据主键删除数据
+     *
+     * @param value
+     * @return  {@link int}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-26 18:00
+     */
+    public int deleteByPkey(Object value){
+        Map<String,Object> map=new HashMap<>();
+        map.put(beseentity.getPrimaryName(),value);
+        return delete(map);
     }
 
     /**
@@ -187,33 +205,20 @@ public  class WrBaseDao <T> {
         jdbcTemplate.execute(sql);
     }
 
-    /**
-     * 得到记录
-     *
-     * @param id
-     * @return
-     */
 
-    public T getById(Serializable id) {
-        String tableName = this.beseentity.getTableName();
-        String primaryName = this.beseentity.getPrimaryName();
-        String sql = "SELECT * FROM " + tableName + " WHERE " + primaryName + " = ?";
-        return (T) jdbcTemplate.query(sql,
-                new DefaultRowMapper(this.tclass, this.beseentity), id).get(0);
-    }
 
     /**
      * 查询记录(param的字符串.不需要写where，必须以and开头)
      * @Param wherestr
      * @return
      */
-    public List<T> receive(String wherestr) {
+    public List<T> retrieve(String wherestr) {
         String sql = "SELECT * FROM "
                 + this.beseentity.getTableName()+" where 1=1 ";
         if(wherestr!=null&&!wherestr.equals("")){
             sql=sql+" "+wherestr;
         }
-        log.info("receive():sql="+sql);
+        log.info("Retrieve():sql="+sql);
         return (List<T>) jdbcTemplate.query(sql,
                 new DefaultRowMapper(this.tclass, this.beseentity));
     }
@@ -224,13 +229,8 @@ public  class WrBaseDao <T> {
      * 查询所有记录
      * @return
      */
-
-    public List<T> receive() {
-        String sql = "SELECT * FROM "
-                + this.beseentity.getTableName()+" where 1=1 ";
-
-        return (List<T>) jdbcTemplate.query(sql,
-                new DefaultRowMapper(this.tclass, this.beseentity));
+    public List<T> RetrieveAll() {
+        return Retrieve(null,null,null);
     }
 
     /**
@@ -238,19 +238,23 @@ public  class WrBaseDao <T> {
      * @Param param的Map数组
      * @return
      */
-
-    public List<T> receive(Map<String,Object> map) {
+    public List<T> Retrieve(Map<String,Object> map, String index, OrderType orderby) {
         StringBuilder sql = new StringBuilder("SELECT * FROM "
                 + this.beseentity.getTableName()+" where 1=1 ");
+        Object[] objects=new Object[map.entrySet().size()];
+        int i=0;
         if(map!=null){
-
             for (Map.Entry<String, Object> entry : map.entrySet()) {
-                sql.append(" and ").append(entry.getKey()).append("=")
-                        .append(entry.getValue());
+                sql.append(" and ").append(entry.getKey()).append("= ?");
+                objects[i]=entry.getValue();
+                i++;
             }
         }
-        return (List<T>) jdbcTemplate.query(sql.toString(),
-                new DefaultRowMapper(this.tclass, this.beseentity));
+        if(orderby!=null&&index!=null&&!index.equals("")){
+            sql.append(" order by  "+index+" "+orderby);
+        }
+        log.info("Retrieve="+sql.toString());
+        return  (List<T>)jdbcTemplate.query(sql.toString(),objects,new DefaultRowMapper(this.tclass, this.beseentity));
     }
 
     /***
@@ -263,30 +267,11 @@ public  class WrBaseDao <T> {
      * @auther woerry
      * @date 2020-03-20 14:19
      */
-    public List<T> receiveASC(Map<String,Object> map,String index) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM "
-                + this.beseentity.getTableName()+" where 1=1 ");
-        if(map!=null){
-
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                String classtype=entry.getValue().getClass().getSimpleName();
-                if(classtype.equals("Double")||classtype.equals("double")||classtype.equals("Float")
-                ||classtype.equals("float")||classtype.equals("Integer")||classtype.equals("int")){
-                    sql.append(" and ").append(entry.getKey()).append("=")
-                            .append(entry.getValue());
-                }else{
-                    sql.append(" and ").append(entry.getKey()).append("= '")
-                            .append(entry.getValue()).append("'");
-                }
-
-            }
-        }
-
-
-        sql.append(" order by ").append(index).append(" desc");
-        return (List<T>) jdbcTemplate.query(sql.toString(),
-                new DefaultRowMapper(this.tclass, this.beseentity));
+    public List<T> RetrieveDesc(Map<String,Object> map,String index) {
+        return Retrieve(map,index,OrderType.DESC);
     }
+
+
 
     /**
      * 查询记录数
@@ -298,11 +283,11 @@ public  class WrBaseDao <T> {
         String tableName = this.beseentity.getTableName();
         StringBuilder countSql = new StringBuilder("select count(*) from ");
         countSql.append(tableName);
-        SqlContext sqlContext = SqlUtils.buildQueryCondition(entity, this.beseentity);
-        if (sqlContext.getSql().length() > 0) {
-            countSql.append(" where ");
-            countSql.append(sqlContext.getSql());
-        }
+//        SqlContext sqlContext = SqlUtils.buildQueryCondition(entity, this.beseentity);
+//        if (sqlContext.getSql().length() > 0) {
+//            countSql.append(" where ");
+//            countSql.append(sqlContext.getSql());
+//        }
 
         return jdbcTemplate.queryForObject(countSql.toString(),Integer.class);
     }
