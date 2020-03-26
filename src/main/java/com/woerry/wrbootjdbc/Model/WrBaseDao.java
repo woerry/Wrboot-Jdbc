@@ -5,6 +5,7 @@ package com.woerry.wrbootjdbc.Model;
 
 
 import com.alibaba.fastjson.JSON;
+import com.woerry.wrbootjdbc.Data.Annotation.WrPrimarykey;
 import com.woerry.wrbootjdbc.Data.Annotation.WrTable;
 import com.woerry.wrbootjdbc.Data.Annotation.WrUnionkey;
 import com.woerry.wrbootjdbc.Data.Constant.OrderType;
@@ -40,6 +41,10 @@ public  class WrBaseDao <T> {
     private Logger log = LoggerFactory.getLogger(WrBaseDao.class);
     private Class<T> tclass;
         private List<WrUnionkey> unionkeys=null;
+    private int keyCount=0;
+
+    private  BaseEntity beseentity=null;
+
     public WrBaseDao() {
 
        Class objclass= (Class<T>) ((ParameterizedType) getClass()
@@ -56,8 +61,6 @@ public  class WrBaseDao <T> {
 
 
 
-    private  BaseEntity beseentity=null;
-
    private   void  setTableClass() throws Exception {
 
        if ( tclass.isAnnotationPresent(WrTable.class)){
@@ -66,7 +69,7 @@ public  class WrBaseDao <T> {
            if (beseentity.getUkeys()!=null&&beseentity.getUkeys().size()>0){
                unionkeys=beseentity.getUkeys();
            }
-
+           keyCount=beseentity.getKeyCount();
            log.info("columns="+ JSON.toJSON(beseentity.getColumns()));
        }else {
            throw new Exception("类中没有@WrTable注释");
@@ -121,18 +124,44 @@ public  class WrBaseDao <T> {
 //        return i;
     }
 
-
-
     /**
-     * 更新记录
-     *
-     * @param entity
+     * 生成关于主键的where后语句
+     * @return
      */
+        private Map<String,Object> generateWhereKeySql(T entity){
+        String res=null;
+            Map<String,Object> map=new HashMap<>();
+          List<WrUnionkey> ulist= beseentity.getUkeys();
+           WrPrimarykey pk= beseentity.getWrPrimarykey();
+        if(keyCount>1){
+            for (WrUnionkey uk:ulist
+                 ) {
+//               map.put(uk.name(),);
+            }
+        }else{
+            res=res+" and "+pk.name()+"=? ";
+        }
+        return null;
+        }
 
-    public void update(T entity) {
-//        SqlContext sqlContext = SqlUtils.buildUpdateSql(entity, this.beseentity);
-//
-//        jdbcTemplate.update(sqlContext.getSql().toString(), sqlContext.getParams().toArray());
+//没写好
+    public int update(Map<String,Object> map) {
+        String tableName = beseentity.getTableName();
+
+        String sql = "update " + tableName +" set ";
+        Object[] objects=new Object[map.entrySet().size()];
+        int[] types=new int[map.entrySet().size()];
+        int i=0;
+        if(map!=null){
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                sql=sql+ " WHERE "+entry.getKey()+"=?";
+                objects[i]=entry.getValue();
+                types[i]=WrSqlUtils.switchArgTypeToInt(entry.getValue());
+                i++;
+            }
+        }
+
+        return jdbcTemplate.update(sql,objects,types);
     }
 
 
@@ -179,6 +208,8 @@ public  class WrBaseDao <T> {
 
        return jdbcTemplate.update(sql,objects,types);
     }
+
+
 
     /***
      * 根据主键删除数据
@@ -229,8 +260,8 @@ public  class WrBaseDao <T> {
      * 查询所有记录
      * @return
      */
-    public List<T> RetrieveAll() {
-        return Retrieve(null,null,null);
+    public List<T> retrieveAll() {
+        return retrieve(null,null,null);
     }
 
     /**
@@ -238,7 +269,7 @@ public  class WrBaseDao <T> {
      * @Param param的Map数组
      * @return
      */
-    public List<T> Retrieve(Map<String,Object> map, String index, OrderType orderby) {
+    public List<T> retrieve(Map<String,Object> map, String index, OrderType orderby) {
         StringBuilder sql = new StringBuilder("SELECT * FROM "
                 + this.beseentity.getTableName()+" where 1=1 ");
         Object[] objects=new Object[map.entrySet().size()];
@@ -267,8 +298,8 @@ public  class WrBaseDao <T> {
      * @auther woerry
      * @date 2020-03-20 14:19
      */
-    public List<T> RetrieveDesc(Map<String,Object> map,String index) {
-        return Retrieve(map,index,OrderType.DESC);
+    public List<T> retrieveDesc(Map<String,Object> map,String index) {
+        return retrieve(map,index,OrderType.DESC);
     }
 
 

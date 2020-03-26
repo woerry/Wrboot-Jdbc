@@ -1,11 +1,13 @@
 package com.woerry.wrbootjdbc.Utils;
 
+import com.woerry.wrbootjdbc.Model.Entity.WrbootDbinfoEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -79,5 +81,35 @@ public class ClassUtils
             e.printStackTrace();
         }
         return null;
+    }
+
+    public static  Object getValue(Object obj,String fieldname) throws IllegalAccessException {
+        Class clazz=obj.getClass();
+       Field[] fields= clazz.getDeclaredFields();
+       Field field=null;
+        for (Field f:fields
+             ) {
+            f.setAccessible(true);
+            if(f.getName().equals(fieldname)){
+                field=f;
+            }
+        }
+       Object oc= field.get(obj);
+        return oc;
+    }
+
+    public static void main(String[] args) {
+        WrbootDbinfoEntity entity=new WrbootDbinfoEntity();
+        entity.setId(1);
+        entity.setDbname("hasagi");
+        entity.setTest("test");
+        entity.test1="test1";
+        Object obj=null;
+        try {
+            obj=(String)getValue(entity,"test");
+            System.out.println(obj);
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
     }
 }

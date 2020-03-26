@@ -10,6 +10,12 @@ public class WrbootDbinfoEntity {
     private String dbpassword ;
     private String  remark;
 
+    private String test;
+    public String test1;
+    public void setTest(String test) {
+        this.test = test;
+    }
+
     public WrbootDbinfoEntity() {
     }
 
