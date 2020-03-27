@@ -20,10 +20,11 @@ public class  BaseEntity<T> implements Serializable  {
     private String key;
     private List<WrUnionkey> ukeys=new ArrayList<WrUnionkey>();
     private List<WrForeignkey> fkeys=new ArrayList<WrForeignkey>();
-    private List<WrColumn> cols=new ArrayList<WrColumn>();
-
-    private String allcols;
+    private List<WrColumn> commoncols=new ArrayList<WrColumn>();
+    private List<WrUnionkey> autoCreatementUkeys=new ArrayList<WrUnionkey>();
+    private String allcolsStr;
     private WrPrimarykey wrPrimarykey=null;
+    // columns：key=字段名称，value=wr注解name
     private Map<String,String> columns=new HashMap<String, String>();
 
     private int keyCount=0;
@@ -39,6 +40,10 @@ public class  BaseEntity<T> implements Serializable  {
      */
     public int getKeyCount() {
         return keyCount;
+    }
+
+    public List<WrUnionkey> getAutoCreatementUkeys() {
+        return autoCreatementUkeys;
     }
 
     /***
@@ -62,8 +67,16 @@ public class  BaseEntity<T> implements Serializable  {
     public List<WrForeignkey> getFkeys() {
         return fkeys;
     }
-    private int key1=0;
-    private int key2=0;
+
+    /***
+     * 构造方法
+     *
+     * @param tclass 传入泛型
+     * @return  {@link null}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-27 14:06
+     */
     public BaseEntity(Class<T> tclass){
 
 
@@ -77,7 +90,7 @@ public class  BaseEntity<T> implements Serializable  {
                 key=wrPrimarykey.name();
                 columns.put(field.getName(),key);
                 keyCount=1;
-                key1=1;
+
                 continue;
             }
 
@@ -85,8 +98,11 @@ public class  BaseEntity<T> implements Serializable  {
             if (wrUnionkey!=null){
                 ukeys.add(wrUnionkey);
                 columns.put(field.getName(),wrUnionkey.name());
+                if(wrUnionkey.isAutoCreate()){
+                    autoCreatementUkeys.add(wrUnionkey);
+                }
                 keyCount++;
-                key2=1;
+
                 continue;
             }
             WrForeignkey wrForeignkey=field.getAnnotation(WrForeignkey.class);
@@ -97,23 +113,22 @@ public class  BaseEntity<T> implements Serializable  {
             }
             WrColumn wrColumn=field.getAnnotation(WrColumn.class);
             if (wrColumn!=null){
-                cols.add(wrColumn);
+                commoncols.add(wrColumn);
                 columns.put(field.getName(),wrColumn.name());
                 continue;
             }
         }
-        if(key1+key2>1){
+        if(wrPrimarykey!=null&&fkeys.size()>0){
             throw new BaseException("不能同时设置主键和联合主键！");
         }
-        key1=0;
-        key2=0;
+
         if (key==null&&ukeys==null){
 
                 throw new BaseException("类中没有@WrPrimarykey或@WrUnionkey主键。");
 
         }
 
-        generateAllcols(key,  ukeys, cols);
+        generateAllcolsStr(key,  ukeys, commoncols);
 
     }
 
@@ -121,11 +136,22 @@ public class  BaseEntity<T> implements Serializable  {
         this.tablename = tablename;
         this.key = key;
         this.ukeys = ukeys;
-        this.cols = cols;
-        generateAllcols(key,  ukeys, cols);
+        this.commoncols = cols;
+        generateAllcolsStr(key,  ukeys, cols);
     }
 
-    private void generateAllcols(String key, List<WrUnionkey> ukeys, List<WrColumn> cols){
+    /***
+     *
+     * 获取所有字段的字符串，以","拼接
+     * @param key
+     * @param ukeys
+     * @param cols
+     * @return  {@link String}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-27 14:07
+     */
+    private String generateAllcolsStr(String key, List<WrUnionkey> ukeys, List<WrColumn> cols){
 
         String result="";
         if(key!=null&&!key.equals("")){
@@ -156,16 +182,20 @@ public class  BaseEntity<T> implements Serializable  {
             }
         }
 
-        this.allcols=result;
-
+        this.allcolsStr=result;
+        return result;
     }
 
-    public String getAllcols() {
-        return allcols;
+    public String getAllcolsStr() {
+        return allcolsStr;
     }
 
-    public void setAllcols(String allcols) {
-        this.allcols = allcols;
+    public void setAllcolsStr(String allcols) {
+        this.allcolsStr = allcols;
+    }
+
+    public List<WrColumn> getCommoncols() {
+        return commoncols;
     }
 
     @Override
@@ -174,7 +204,7 @@ public class  BaseEntity<T> implements Serializable  {
                 "tablename='" + tablename + '\'' +
                 ", key='" + key + '\'' +
                 ", ukeys=" + ukeys +
-                ", cols=" + cols +
+                ", cols=" + commoncols +
                 '}';
     }
 
@@ -203,11 +233,11 @@ public class  BaseEntity<T> implements Serializable  {
     }
 
     public List<WrColumn> getCols() {
-        return cols;
+        return commoncols;
     }
 
     public void setCols(List<WrColumn> cols) {
-        this.cols = cols;
+        this.commoncols = cols;
     }
 
     public String getTableName(String entityName) {

@@ -5,28 +5,21 @@ package com.woerry.wrbootjdbc.Model;
 
 
 import com.alibaba.fastjson.JSON;
-import com.woerry.wrbootjdbc.Data.Annotation.WrPrimarykey;
-import com.woerry.wrbootjdbc.Data.Annotation.WrTable;
-import com.woerry.wrbootjdbc.Data.Annotation.WrUnionkey;
+import com.woerry.wrbootjdbc.Data.Annotation.*;
+import com.woerry.wrbootjdbc.Data.Constant.DbOperateType;
 import com.woerry.wrbootjdbc.Data.Constant.OrderType;
+import com.woerry.wrbootjdbc.Exception.BaseException;
+import com.woerry.wrbootjdbc.Utils.ClassUtils;
 import com.woerry.wrbootjdbc.Utils.DefaultRowMapper;
 import com.woerry.wrbootjdbc.Utils.WrSqlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
-import org.springframework.lang.Nullable;
 
-import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Types;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,11 +33,14 @@ import java.util.Map;
 public  class WrBaseDao <T> {
     private Logger log = LoggerFactory.getLogger(WrBaseDao.class);
     private Class<T> tclass;
-        private List<WrUnionkey> unionkeys=null;
+    private List<WrUnionkey> unionkeys=null;
+    private List<WrForeignkey> foreignkeys=null;
+    private List<WrColumn> comcols=null;
+    private WrPrimarykey pkey=null;
     private int keyCount=0;
-
     private  BaseEntity beseentity=null;
-
+    private String tableName=null;
+    private List<WrUnionkey> autoCreatementUkeys=null;
     public WrBaseDao() {
 
        Class objclass= (Class<T>) ((ParameterizedType) getClass()
@@ -62,14 +58,19 @@ public  class WrBaseDao <T> {
 
 
    private   void  setTableClass() throws Exception {
-
+       tableName = this.beseentity.getTableName();
        if ( tclass.isAnnotationPresent(WrTable.class)){
 
            beseentity=new BaseEntity<T>(tclass);
            if (beseentity.getUkeys()!=null&&beseentity.getUkeys().size()>0){
                unionkeys=beseentity.getUkeys();
+               autoCreatementUkeys=beseentity.getAutoCreatementUkeys();
+           }
+           if(beseentity.getWrPrimarykey()!=null){
+               pkey=beseentity.getWrPrimarykey();
            }
            keyCount=beseentity.getKeyCount();
+           comcols=beseentity.getCommoncols();
            log.info("columns="+ JSON.toJSON(beseentity.getColumns()));
        }else {
            throw new Exception("类中没有@WrTable注释");
@@ -88,9 +89,6 @@ public  class WrBaseDao <T> {
         this.jdbcTemplate = jdbcTemplate;
         log.info("初始化jdbcTemplate="+this.jdbcTemplate);
     }
-
-
-
 
 
 
@@ -124,63 +122,202 @@ public  class WrBaseDao <T> {
 //        return i;
     }
 
-    /**
-     * 生成关于主键的where后语句
-     * @return
-     */
-        private Map<String,Object> generateWhereKeySql(T entity){
-        String res=null;
-            Map<String,Object> map=new HashMap<>();
-          List<WrUnionkey> ulist= beseentity.getUkeys();
-           WrPrimarykey pk= beseentity.getWrPrimarykey();
-        if(keyCount>1){
-            for (WrUnionkey uk:ulist
-                 ) {
-//               map.put(uk.name(),);
+
+    public Object insert(Map<String,Object> map,T entity) {
+        String sql=" insert into "+tableName+" (";
+        //主键自增
+        if(pkey.isAutoCreate()){
+            for (Map.Entry<String, Object> param:map.entrySet()
+            ) {
+                if(param.getKey().equals(pkey.name())){
+                    continue;
+                }
+                    sql=sql+" "+param.getKey()+",";
             }
-        }else{
-            res=res+" and "+pk.name()+"=? ";
-        }
-        return null;
+            sql=sql.substring(0,sql.length()-1)+" ) values (";
+        }else
+        if(autoCreatementUkeys.size()>0){
+            List<String> ukname=new ArrayList<>();
+            for (WrUnionkey uk:autoCreatementUkeys
+                 ) {
+                if(uk.isAutoCreate()) {
+                    ukname.add(uk.name());
+                }
+            }
+
+            for (Map.Entry<String, Object> param:map.entrySet()
+            ) {
+                if(ukname.contains(param.getKey())){
+                    continue;
+                }
+                sql=sql+" "+param.getKey()+",";
+            }
+            sql=sql.substring(0,sql.length()-1)+" ) values (";
+        }else {
+
+
         }
 
-//没写好
-    public int update(Map<String,Object> map) {
-        String tableName = beseentity.getTableName();
+        return null;
+    }
+
+
+
+    /**
+     * 生成关于主键的where后map.用来组装where后的限制条件。
+     * @return
+     */
+        private Map<String,Object> generateKeyMap(T entity){
+            Map<String,Object> map=new HashMap<>();
+
+
+        if(keyCount>1){
+            for (WrUnionkey uk:unionkeys
+                 ) {
+               map.put(uk.name(), ClassUtils.getValue(entity,uk.name()));
+            }
+        }else{
+            map.put(pkey.name(), ClassUtils.getValue(entity,pkey.name()));
+        }
+        return map;
+        }
+    /**
+     * 生成关于主键的where后sql.用来组装where后的限制条件。
+     * @return
+     */
+    private String  generateKeySql(T entity){
+            String res=null;
+
+
+        if(keyCount>1){
+            for (WrUnionkey uk:unionkeys
+            ) {
+                res=" and "+uk.name()+"="+WrSqlUtils.switchArgType(ClassUtils.getValue(entity,uk.name())) ;
+            }
+        }else{
+            res=" and "+pkey.name()+"="+WrSqlUtils.switchArgType(ClassUtils.getValue(entity,pkey.name())) ;
+        }
+        return res;
+    }
+
+
+    /***
+     * 更新传入的entity
+     *
+     * @param entity
+     * @return  {@link int}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-27 15:06
+     */
+    public int update(T entity){
+        Map<String,Object> map=new HashMap<>();
+
+        for (WrColumn comcol:comcols
+             ) {
+            map.put(comcol.name(),ClassUtils.getValue(entity,comcol.name()));
+        }
+
+        if(!pkey.isAutoCreate()){
+            //只有不新增的主键，才能更新
+            map.put(pkey.name(),ClassUtils.getValue(entity,pkey.name()));
+        }
+
+        for (WrUnionkey ukey:unionkeys
+             ) {
+            if(!ukey.isAutoCreate()){
+                //只有不新增的主键，才能更新
+                map.put(ukey.name(),ClassUtils.getValue(entity,ukey.name()));
+            }
+        }
+
+       return update(map,entity);
+    }
+
+    /***
+     * 将map的值更新给entity
+     *
+     * @param map 传入的更新参数
+     * @param entity 原entity
+     * @return  {@link int}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-27 14:50
+     */
+    public int update(Map<String,Object> map,T entity) {
+        if(map==null){
+            throw new BaseException("update的map参数为空!");
+        }
+        String whereAndSql=generateKeySql(entity);
 
         String sql = "update " + tableName +" set ";
         Object[] objects=new Object[map.entrySet().size()];
         int[] types=new int[map.entrySet().size()];
         int i=0;
-        if(map!=null){
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                sql=sql+ " WHERE "+entry.getKey()+"=?";
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+                sql=sql+ "  "+entry.getKey()+"=?,";
                 objects[i]=entry.getValue();
                 types[i]=WrSqlUtils.switchArgTypeToInt(entry.getValue());
                 i++;
-            }
         }
+        sql=sql.substring(0,sql.length()-1);
+        sql=sql+" where 1=1 "+whereAndSql;
 
         return jdbcTemplate.update(sql,objects,types);
     }
 
 
+
+
     /***
+     *  删除entity。根据主键或者联合主键的值。
      *
-     * 更新记录，除了某列
-     * @param entity
-     * @param exceptcolumn  被排除的某列
-     * @return
+     * @param entity 要删除的entity
+     * @return  {@link int}
      * @throws
      * @auther woerry
-     * @date 2020-03-20 15:04
+     * @date 2020-03-27 10:40
      */
-    public void updateExcept(T entity,@Nullable String exceptcolumn) {
-//        SqlContext sqlContext = SqlUtils.buildUpdateSqlExcept(entity, this.beseentity,exceptcolumn);
-//        System.out.println("updateExceptsql="+sqlContext.getSql());
-//        jdbcTemplate.update(sqlContext.getSql().toString(), sqlContext.getParams().toArray());
+    public int delete(T entity){
+
+        processForeignkeys(DbOperateType.DL,entity);
+        return delete(generateKeyMap(entity));
     }
 
+
+    /***
+     * 处理外键
+     *
+     * @param
+     * @return  {@link String}
+     * @throws
+     * @auther woerry
+     * @date 2020-03-27 10:57
+     */
+    private Boolean processForeignkeys(DbOperateType optype,T entity){
+
+        String sql=null;
+
+        if(foreignkeys.size()<1){
+            return false;
+        }
+        for (WrForeignkey fkey:foreignkeys
+             ) {
+            switch (optype){
+                case DL:
+                    sql=" delete from "+fkey.aimtable()+" " +
+                            "where "+fkey.aimcol()+"="+WrSqlUtils.switchArgType(ClassUtils.getValue(entity,fkey.name()));
+                   log.info("执行删除外键的关联数据sql="+sql);
+                    this.getJdbcTemplate().execute(sql);
+                    break;
+                default:
+
+            }
+        }
+
+        return true;
+
+    }
 
     /***
      * 删除数据
@@ -192,7 +329,7 @@ public  class WrBaseDao <T> {
      * @date 2020-03-26 18:01
      */
     public int delete(Map<String,Object> map) {
-        String tableName = this.beseentity.getTableName();
+
         String sql = "DELETE FROM " + tableName ;
         Object[] objects=new Object[map.entrySet().size()];
         int[] types=new int[map.entrySet().size()];
@@ -211,27 +348,14 @@ public  class WrBaseDao <T> {
 
 
 
-    /***
-     * 根据主键删除数据
-     *
-     * @param value
-     * @return  {@link int}
-     * @throws
-     * @auther woerry
-     * @date 2020-03-26 18:00
-     */
-    public int deleteByPkey(Object value){
-        Map<String,Object> map=new HashMap<>();
-        map.put(beseentity.getPrimaryName(),value);
-        return delete(map);
-    }
+
 
     /**
      * 删除所有记录
      */
 
     public void deleteAll() {
-        String tableName = this.beseentity.getTableName();
+
         String sql = " TRUNCATE TABLE " + tableName;
         jdbcTemplate.execute(sql);
     }
@@ -245,7 +369,7 @@ public  class WrBaseDao <T> {
      */
     public List<T> retrieve(String wherestr) {
         String sql = "SELECT * FROM "
-                + this.beseentity.getTableName()+" where 1=1 ";
+                + tableName+" where 1=1 ";
         if(wherestr!=null&&!wherestr.equals("")){
             sql=sql+" "+wherestr;
         }
@@ -271,7 +395,7 @@ public  class WrBaseDao <T> {
      */
     public List<T> retrieve(Map<String,Object> map, String index, OrderType orderby) {
         StringBuilder sql = new StringBuilder("SELECT * FROM "
-                + this.beseentity.getTableName()+" where 1=1 ");
+                + tableName+" where 1=1 ");
         Object[] objects=new Object[map.entrySet().size()];
         int i=0;
         if(map!=null){
@@ -307,18 +431,12 @@ public  class WrBaseDao <T> {
     /**
      * 查询记录数
      *
-     * @param entity
      * @return
      */
-    public int queryCount(T entity) {
-        String tableName = this.beseentity.getTableName();
+    public int queryCount() {
+
         StringBuilder countSql = new StringBuilder("select count(*) from ");
         countSql.append(tableName);
-//        SqlContext sqlContext = SqlUtils.buildQueryCondition(entity, this.beseentity);
-//        if (sqlContext.getSql().length() > 0) {
-//            countSql.append(" where ");
-//            countSql.append(sqlContext.getSql());
-//        }
 
         return jdbcTemplate.queryForObject(countSql.toString(),Integer.class);
     }

@@ -83,18 +83,35 @@ public class ClassUtils
         return null;
     }
 
-    public static  Object getValue(Object obj,String fieldname) throws IllegalAccessException {
+    /***
+     * 取得指定对象obj上由此fieldname 表示的字段的值
+     *
+     * @param obj 拥有该field的对象
+     * @param fieldname 字段
+     * @return  {@link Object} 
+     * @throws 
+     * @auther woerry
+     * @date 2020-03-27 09:59
+     */
+    public static  Object getValue(Object obj,String fieldname) {
         Class clazz=obj.getClass();
        Field[] fields= clazz.getDeclaredFields();
        Field field=null;
+        Object oc=null;
+        try{
         for (Field f:fields
              ) {
             f.setAccessible(true);
             if(f.getName().equals(fieldname)){
                 field=f;
             }
+
         }
-       Object oc= field.get(obj);
+          oc= field.get(obj);
+       }catch (IllegalAccessException e) {
+           e.printStackTrace();
+       }
+
         return oc;
     }
 
@@ -105,11 +122,9 @@ public class ClassUtils
         entity.setTest("test");
         entity.test1="test1";
         Object obj=null;
-        try {
+
             obj=(String)getValue(entity,"test");
             System.out.println(obj);
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        }
+
     }
 }
