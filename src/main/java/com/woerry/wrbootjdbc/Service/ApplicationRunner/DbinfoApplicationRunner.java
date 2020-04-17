@@ -19,11 +19,11 @@ public class DbinfoApplicationRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        String sql="select * from test";
-       List<Map<String,Object>> list= h2JdbcTemplate.queryForList(sql);
-        for (Map<String,Object> map:list
-             ) {
-            System.out.println(map.get("name").toString());
-        }
+        String sql="select * from wrboot_dbinfo";
+//       List<Map<String,Object>> list= h2JdbcTemplate.queryForList(sql);
+////        for (Map<String,Object> map:list
+////             ) {
+////            System.out.println(map.get("name").toString());
+////        }
     }
 }

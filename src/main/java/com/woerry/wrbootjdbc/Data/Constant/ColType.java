@@ -7,7 +7,7 @@ package com.woerry.wrbootjdbc.Data.Constant;
  * @date 2020-03-26 15:22
  */
 public enum ColType {
-    SERIAL,INTEGER ,VARCHA,DATETIME,FLOAT,INT,DECIMAL,CHAR,TEXT,DATE,BYTE
+    SERIAL,INTEGER ,VARCHAR,DATETIME,FLOAT,INT,DECIMAL,CHAR,TEXT,DATE,BYTE
     ;
 
 

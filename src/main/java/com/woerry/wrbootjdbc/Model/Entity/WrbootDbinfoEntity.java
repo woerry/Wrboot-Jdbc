@@ -1,20 +1,31 @@
 package com.woerry.wrbootjdbc.Model.Entity;
 
+import com.woerry.wrbootjdbc.Data.Annotation.WrColumn;
+import com.woerry.wrbootjdbc.Data.Annotation.WrPrimarykey;
+import com.woerry.wrbootjdbc.Data.Annotation.WrTable;
+import com.woerry.wrbootjdbc.Data.Constant.ColType;
+import com.woerry.wrbootjdbc.Data.Constant.DbType;
+
+@WrTable(name = "wrboot_dbinfo",dbType = DbType.H2)
 public class WrbootDbinfoEntity {
+    @WrPrimarykey(name = "id",isAutoCreate = true,colType = ColType.INT)
     private Integer id;
+    @WrColumn(name = "dbtype",colType=ColType.VARCHAR)
     private String dbtype;
+    @WrColumn(name = "dbname",colType=ColType.VARCHAR)
     private String dbname;
+    @WrColumn(name = "dbdriverclass",colType=ColType.VARCHAR)
     private String dbdriverclass;
+    @WrColumn(name = "dburl",colType=ColType.VARCHAR)
     private String dburl;
+    @WrColumn(name = "dbuser",colType=ColType.VARCHAR)
     private String dbuser;
+    @WrColumn(name = "dbpassword",colType=ColType.VARCHAR)
     private String dbpassword ;
+    @WrColumn(name = "remark",colType=ColType.VARCHAR)
     private String  remark;
 
-    private String test;
-    public String test1;
-    public void setTest(String test) {
-        this.test = test;
-    }
+
 
     public WrbootDbinfoEntity() {
     }

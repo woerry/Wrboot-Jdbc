@@ -119,8 +119,6 @@ public class ClassUtils
         WrbootDbinfoEntity entity=new WrbootDbinfoEntity();
         entity.setId(1);
         entity.setDbname("hasagi");
-        entity.setTest("test");
-        entity.test1="test1";
         Object obj=null;
 
             obj=(String)getValue(entity,"test");
