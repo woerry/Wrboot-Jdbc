@@ -94,49 +94,45 @@ public  class WrBaseDao <T> {
 
 
     /**
-     * 插入一条记录(自增主键适用)
+     * 插入一条记录
      *
      * @param entity
      */
-    public Long insert(T entity) {
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-//        final SqlContext sqlContext = SqlUtils.buildInsertSql(entity, this.beseentity);
-//
-//        log.info("insert:"+entity.getClass().getSimpleName()+",sql="+sqlContext.getSql());
-//        PreparedStatementCreator psc=new PreparedStatementCreator(){
-//            public PreparedStatement createPreparedStatement(Connection con) throws SQLException {
-//                PreparedStatement ps = con.prepareStatement(sqlContext.getSql().toString(),
-//                        new String[] { sqlContext.getPrimaryKey() });
-//                int index = 0;
-//                for (Object param : sqlContext.getParams()) {
-//                    index++;
-//                    ps.setObject(index, param);
-//                }
-//                return ps;
-//            }
-//        };
-//        jdbcTemplate.update(psc , keyHolder);
-
-
-        return keyHolder.getKey().longValue();
-//        return i;
+    public int insert(T entity) {
+        return insert(getUpdateMap(entity),entity);
     }
 
 
-    public Object insert(Map<String,Object> map,T entity) {
+    public int insert(Map<String,Object> map,T entity) {
         String sql=" insert into "+tableName+" (";
+        String backsql="";
+        int i=0;
+        Object[] objects=null;
+        int[] types=null;
         //主键自增
         if(pkey.isAutoCreate()){
+            objects=new Object[map.entrySet().size()-1];
+            types=new int[map.entrySet().size()-1];
             for (Map.Entry<String, Object> param:map.entrySet()
             ) {
                 if(param.getKey().equals(pkey.name())){
                     continue;
                 }
                     sql=sql+" "+param.getKey()+",";
+                backsql=backsql+" ?,";
+                objects[i]=param.getValue();
+                types[i]=WrSqlUtils.switchArgTypeToInt(param.getValue());
+
+                i++;
             }
-            sql=sql.substring(0,sql.length()-1)+" ) values (";
+
+
         }else
         if(autoCreatementUkeys.size()>0){
+            objects=new Object[map.entrySet().size()
+                    -autoCreatementUkeys.size()];
+            types=new int[map.entrySet().size()
+                    -autoCreatementUkeys.size()];
             List<String> ukname=new ArrayList<>();
             for (WrUnionkey uk:autoCreatementUkeys
                  ) {
@@ -151,14 +147,36 @@ public  class WrBaseDao <T> {
                     continue;
                 }
                 sql=sql+" "+param.getKey()+",";
+                backsql=backsql+" ?,";
+                objects[i]=param.getValue();
+                types[i]=WrSqlUtils.switchArgTypeToInt(param.getValue());
+
+                i++;
             }
-            sql=sql.substring(0,sql.length()-1)+" ) values (";
+
         }else {
+            //没有自增
+            objects=new Object[map.entrySet().size()];
+            types=new int[map.entrySet().size()
+                    ];
+            for (Map.Entry<String, Object> param:map.entrySet()
+            ) {
+                sql=sql+" "+param.getKey()+",";
+                backsql=backsql+" ?,";
+                objects[i]=param.getValue();
+                types[i]=WrSqlUtils.switchArgTypeToInt(param.getValue());
+
+                i++;
+            }
 
 
         }
+        //拼接values后面的值
+        sql=sql.substring(0,sql.length()-1)+" ) values ("
+        +backsql.substring(0,backsql.length()-1)+" )";
 
-        return null;
+
+        return jdbcTemplate.update(sql,objects,types);
     }
 
 
@@ -200,6 +218,34 @@ public  class WrBaseDao <T> {
         return res;
     }
 
+    /**
+     *  把entity转化为新增和更改的map。要处理主键。
+     * @param entity
+     * @return
+     */
+    private Map<String,Object> getUpdateMap(T entity){
+        Map<String,Object> map=new HashMap<>();
+
+        for (WrColumn comcol:comcols
+        ) {
+            map.put(comcol.name(),ClassUtils.getValue(entity,comcol.name()));
+        }
+
+        if(!pkey.isAutoCreate()){
+            //只有不新增的主键，才能更新
+            map.put(pkey.name(),ClassUtils.getValue(entity,pkey.name()));
+        }
+
+        for (WrUnionkey ukey:unionkeys
+        ) {
+            if(!ukey.isAutoCreate()){
+                //只有不新增的主键，才能更新
+                map.put(ukey.name(),ClassUtils.getValue(entity,ukey.name()));
+            }
+        }
+        return map;
+    }
+
 
     /***
      * 更新传入的entity
@@ -211,27 +257,9 @@ public  class WrBaseDao <T> {
      * @date 2020-03-27 15:06
      */
     public int update(T entity){
-        Map<String,Object> map=new HashMap<>();
 
-        for (WrColumn comcol:comcols
-             ) {
-            map.put(comcol.name(),ClassUtils.getValue(entity,comcol.name()));
-        }
 
-        if(!pkey.isAutoCreate()){
-            //只有不新增的主键，才能更新
-            map.put(pkey.name(),ClassUtils.getValue(entity,pkey.name()));
-        }
-
-        for (WrUnionkey ukey:unionkeys
-             ) {
-            if(!ukey.isAutoCreate()){
-                //只有不新增的主键，才能更新
-                map.put(ukey.name(),ClassUtils.getValue(entity,ukey.name()));
-            }
-        }
-
-       return update(map,entity);
+       return update(getUpdateMap(entity),entity);
     }
 
     /***
