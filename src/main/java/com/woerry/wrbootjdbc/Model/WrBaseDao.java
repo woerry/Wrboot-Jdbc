@@ -42,12 +42,20 @@ public  class WrBaseDao <T> {
     private String tableName=null;
     private List<WrUnionkey> autoCreatementUkeys=null;
     public WrBaseDao() {
+        init();
+    }
+    public WrBaseDao(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate=jdbcTemplate;
+        init();
+    }
 
-       Class objclass= (Class<T>) ((ParameterizedType) getClass()
-               .getGenericSuperclass()).getActualTypeArguments()[0];
+    //初始化
+    private void init(){
+        Class objclass= (Class<T>) ((ParameterizedType) getClass()
+                .getGenericSuperclass()).getActualTypeArguments()[0];
 
-      tclass= (Class<T>) objclass;
-
+        tclass= (Class<T>) objclass;
+        beseentity=new BaseEntity(tclass);
         try {
             setTableClass();
         } catch (Exception e) {
@@ -57,7 +65,8 @@ public  class WrBaseDao <T> {
 
 
 
-   private   void  setTableClass() throws Exception {
+
+    private   void  setTableClass() throws Exception {
        tableName = this.beseentity.getTableName();
        if ( tclass.isAnnotationPresent(WrTable.class)){
 
